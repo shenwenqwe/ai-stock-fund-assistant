@@ -2,31 +2,32 @@ const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 // JSONP helper for East Money APIs (bypass CORS)
 function jsonp(url) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const cbName = 'cb_' + Math.random().toString(36).slice(2, 8)
     const script = document.createElement('script')
-    const timeout = setTimeout(() => { cleanup(); resolve(null) }, 8000)
+    const timeout = setTimeout(() => { cleanup(); console.warn('JSONP timeout:', url); resolve(null) }, 8000)
     function cleanup() {
       clearTimeout(timeout)
       delete window[cbName]
       if (script.parentNode) script.parentNode.removeChild(script)
     }
     window[cbName] = (data) => { cleanup(); resolve(data) }
-    script.src = url.includes('callback=') ? url.replace('callback=', `callback=${cbName}`) : `${url}${url.includes('?') ? '&' : '?'}callback=${cbName}`
-    script.onerror = () => { cleanup(); resolve(null) }
+    const sep = url.includes('?') ? '&' : '?'
+    script.src = `${url}${sep}callback=${cbName}`
+    script.onerror = () => { cleanup(); console.warn('JSONP error:', url); resolve(null) }
     document.head.appendChild(script)
   })
 }
 
-// Try backend first, then JSONP fallback
+// Try backend API first (Express server or same-origin)
 async function request(path) {
-  if (API_BASE) {
-    try {
-      const res = await fetch(`${API_BASE}${path}`)
-      const json = await res.json()
-      if (json.success) return json.data
-    } catch (e) { /* fallback to JSONP */ }
-  }
+  try {
+    const base = API_BASE || ''
+    const res = await fetch(`${base}${path}`, { signal: AbortSignal.timeout(5000) })
+    if (!res.ok) return null
+    const json = await res.json()
+    if (json.success) return json.data
+  } catch (e) { /* backend unavailable, will use JSONP fallback */ }
   return null
 }
 

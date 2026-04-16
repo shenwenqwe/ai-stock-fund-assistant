@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Bell, Filter, Star, Shield, RefreshCw } from 'lucide-react'
-import { aiRecommendations, hotIndustries, hotFunds } from '../data/mockData'
+import { hotIndustries, hotFunds } from '../data/mockData'
 import { fetchIndices, fetchSectors, fetchStocks, fetchFunds } from '../api/client'
 import IndexBar from '../components/IndexBar'
-import RecommendCard from '../components/RecommendCard'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -16,8 +15,6 @@ export default function HomePage() {
   const [topStocks, setTopStocks] = useState(null)
   const [topFunds, setTopFunds] = useState(null)
   const [loading, setLoading] = useState(true)
-
-  const filtered = aiRecommendations.filter(r => r.type === tabType)
 
   useEffect(() => {
     loadRealData()
@@ -74,10 +71,13 @@ export default function HomePage() {
       {/* Market Indices */}
       <IndexBar data={indices} />
 
-      {/* AI Recommendations */}
+      {/* Today's Top Gainers */}
       <div className="card mb-3">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-bold text-gray-800">🤖 AI今日精选10支可入手机会</div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm font-bold text-gray-800">🤖 今日涨幅排行 TOP10（实时）</div>
+          <button onClick={loadRealData} className="text-xs text-accent flex items-center gap-1">
+            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> 刷新
+          </button>
         </div>
         <div className="flex gap-2 mb-3">
           <button
@@ -93,12 +93,39 @@ export default function HomePage() {
             }`}
           >基金</button>
         </div>
-      </div>
 
-      {/* Recommendation Cards */}
-      {filtered.map(item => (
-        <RecommendCard key={item.id} item={item} onAddFavorite={addFavorite} />
-      ))}
+        {tabType === 'stock' ? (
+          topStocks ? topStocks.map(s => (
+            <div key={s.code} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+              <div>
+                <div className="text-sm font-medium text-gray-900">{s.name}</div>
+                <div className="text-xs text-gray-400">{s.code}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-bold text-gray-900">{Number(s.price).toFixed(2)}</div>
+                <div className={`text-xs font-bold ${Number(s.changePercent) >= 0 ? 'rise' : 'fall'}`}>
+                  {Number(s.changePercent) >= 0 ? '+' : ''}{Number(s.changePercent).toFixed(2)}%
+                </div>
+              </div>
+            </div>
+          )) : <div className="text-center text-gray-400 text-xs py-4">加载中...</div>
+        ) : (
+          topFunds ? topFunds.map(f => (
+            <div key={f.code} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+              <div>
+                <div className="text-sm font-medium text-gray-900 truncate max-w-[180px]">{f.name}</div>
+                <div className="text-xs text-gray-400">{f.code}</div>
+              </div>
+              <div className="text-right">
+                <div className={`text-sm font-bold ${Number(f.dayChange) >= 0 ? 'rise' : 'fall'}`}>
+                  {Number(f.dayChange) >= 0 ? '+' : ''}{Number(f.dayChange).toFixed(2)}%
+                </div>
+                <div className="text-xs text-gray-400">近1月 {Number(f.monthChange) >= 0 ? '+' : ''}{Number(f.monthChange).toFixed(2)}%</div>
+              </div>
+            </div>
+          )) : <div className="text-center text-gray-400 text-xs py-4">加载中...</div>
+        )}
+      </div>
 
       {/* Hot Industries */}
       <div className="card mb-3">
