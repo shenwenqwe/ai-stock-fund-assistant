@@ -201,6 +201,49 @@ export async function fetchFundHoldings(code) {
   return request(`/api/fund-holdings/${code}`)
 }
 
+// Fetch intraday trend (minute data) for a stock
+export async function fetchStockTrend(code) {
+  try {
+    const prefix = code.startsWith('6') || code.startsWith('5') ? '1' : '0'
+    const url = `https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid=${prefix}.${code}&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55&iscr=0&ndays=1`
+    const text = await proxyFetch(url)
+    const data = parseEM(text)
+    if (!data?.data?.trends) return null
+    const preClose = data.data.preClose
+    return data.data.trends.map(t => {
+      const parts = t.split(',')
+      return {
+        time: parts[0].split(' ')[1] || parts[0],
+        price: parseFloat(parts[1]),
+        avg: parseFloat(parts[2]),
+        volume: parseInt(parts[4]),
+        preClose,
+      }
+    })
+  } catch (e) {
+    console.warn('fetchStockTrend failed:', e)
+    return null
+  }
+}
+
+// Fetch fund NAV trend (recent 30 days)
+export async function fetchFundTrend(code) {
+  try {
+    const url = `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=30`
+    const text = await proxyFetch(url)
+    const data = parseEM(text)
+    const items = data?.Data?.LSJZList || []
+    return items.reverse().map(item => ({
+      time: item.FSRQ,
+      price: parseFloat(item.DWJZ),
+      change: parseFloat(item.JZZZL) || 0,
+    }))
+  } catch (e) {
+    console.warn('fetchFundTrend failed:', e)
+    return null
+  }
+}
+
 export async function searchStock(query) {
   const serverData = await request(`/api/search?q=${encodeURIComponent(query)}`)
   if (serverData) return serverData
