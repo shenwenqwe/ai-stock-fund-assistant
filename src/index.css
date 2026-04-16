@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@theme {
+  --color-rise: #ef4444;
+  --color-fall: #22c55e;
+  --color-neutral: #6b7280;
+  --color-primary: #1e40af;
+  --color-accent: #3b82f6;
+  --color-card: #ffffff;
+  --color-page: #f3f4f6;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background-color: var(--color-page);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+.rise { color: var(--color-rise); }
+.fall { color: var(--color-fall); }
+
+.card {
+  background: var(--color-card);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+  border-radius: 0.5rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.btn-primary:active {
+  opacity: 0.8;
+}
+
+.btn-outline {
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.btn-outline:active {
+  background: var(--color-accent);
+  color: white;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.tag-risk-low {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.tag-risk-mid {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: #fef9c3;
+  color: #a16207;
+}
+
+.tag-risk-high {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.tag-hot {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.tag-ai {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
