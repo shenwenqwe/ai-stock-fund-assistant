@@ -89,27 +89,38 @@ app.get('/api/funds', async (req, res) => {
     const page = req.query.page || 1
     const pageSize = req.query.size || 30
     const fundType = req.query.type || '' // 1=股票型 2=混合型 3=指数型 4=债券型
-    const url = `https://fundapi.eastmoney.com/fundapi/FundRankListApi/FundRankList?fundType=${fundType}&pageIndex=${page}&pageSize=${pageSize}&sort=desc&orderBy=D1&callback=`
-    const data = await (await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://fund.eastmoney.com/' },
+    const ftMap = { '1': 'gp', '2': 'hh', '3': 'zq', '4': 'zq', '': 'all' }
+    const ft = ftMap[fundType] || 'all'
+    const url = `https://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=${ft}&rs=&gs=0&sc=rzdf&st=desc&pi=${page}&pn=${pageSize}&dx=1`
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Referer': 'https://fund.eastmoney.com/data/fundranking.html',
+      },
       timeout: 8000,
-    })).json()
-    const items = data?.Data?.RankList || []
-    const result = items.map(item => ({
-      name: item.FundName,
-      code: item.FundCode,
-      nav: item.Nav,
-      accNav: item.AccNav,
-      dayChange: item.D1,
-      weekChange: item.W1,
-      monthChange: item.M1,
-      threeMonthChange: item.M3,
-      sixMonthChange: item.M6,
-      yearChange: item.Y1,
-      fundType: item.FundType,
-      riskLevel: item.RiskLevel || 'mid',
+    })
+    const text = await resp.text()
+    // Parse: var rankData = {datas:["code,name,...","code,name,..."],allRecords:123,...}
+    const datasMatch = text.match(/datas:\[(.*?)\]/)
+    const totalMatch = text.match(/allRecords:(\d+)/)
+    const total = totalMatch ? parseInt(totalMatch[1]) : 0
+    const items = datasMatch ? datasMatch[1].split('","').map(s => s.replace(/"/g, '').split(',')) : []
+    // Fields: 0=code,1=name,2=abbr,3=date,4=nav,5=accNav,6=dayChange,7=weekChange,8=monthChange,9=3mChange,10=6mChange,11=yearChange,12=2yChange,13=3yChange,14=thisYearChange
+    const result = items.map(f => ({
+      name: f[1],
+      code: f[0],
+      nav: f[4] || '--',
+      accNav: f[5] || '--',
+      dayChange: parseFloat(f[6]) || 0,
+      weekChange: parseFloat(f[7]) || 0,
+      monthChange: parseFloat(f[8]) || 0,
+      threeMonthChange: parseFloat(f[9]) || 0,
+      sixMonthChange: parseFloat(f[10]) || 0,
+      yearChange: parseFloat(f[11]) || 0,
+      fundType: ft === 'all' ? '混合型' : ft === 'gp' ? '股票型' : ft === 'zq' ? '债券型' : '混合型',
+      riskLevel: 'mid',
     }))
-    res.json({ success: true, total: data?.Data?.TotalCount || 0, data: result })
+    res.json({ success: true, total, data: result })
   } catch (e) {
     res.json({ success: false, error: e.message, data: [] })
   }

@@ -101,23 +101,24 @@ export async function fetchFunds({ page = 1, size = 30, type = '' } = {}) {
   if (serverData) return serverData
 
   try {
-    const data = await (await fetch(`https://fundapi.eastmoney.com/fundapi/FundRankListApi/FundRankList?fundType=${type}&pageIndex=${page}&pageSize=${size}&sort=desc&orderBy=D1`, {
-      headers: { 'Accept': 'application/json' },
-    })).json()
-    const items = data?.Data?.RankList || []
-    return items.map(item => ({
-      name: item.FundName,
-      code: item.FundCode,
-      nav: item.Nav,
-      accNav: item.AccNav,
-      dayChange: item.D1,
-      weekChange: item.W1,
-      monthChange: item.M1,
-      threeMonthChange: item.M3,
-      sixMonthChange: item.M6,
-      yearChange: item.Y1,
-      fundType: item.FundType,
-      riskLevel: item.RiskLevel || 'mid',
+    const ftMap = { '1': 'gp', '2': 'hh', '3': 'zq', '4': 'zq', '': 'all' }
+    const ft = ftMap[type] || 'all'
+    const url = `https://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=${ft}&rs=&gs=0&sc=rzdf&st=desc&pi=${page}&pn=${size}&dx=1`
+    const resp = await fetch(url, {
+      headers: { 'Referer': 'https://fund.eastmoney.com/data/fundranking.html' },
+    })
+    const text = await resp.text()
+    const datasMatch = text.match(/datas:\[(.*?)\]/)
+    const items = datasMatch ? datasMatch[1].split('","').map(s => s.replace(/"/g, '').split(',')) : []
+    return items.map(f => ({
+      name: f[1],
+      code: f[0],
+      nav: f[4] || '--',
+      dayChange: parseFloat(f[6]) || 0,
+      weekChange: parseFloat(f[7]) || 0,
+      monthChange: parseFloat(f[8]) || 0,
+      fundType: ft === 'gp' ? '股票型' : ft === 'zq' ? '债券型' : '混合型',
+      riskLevel: 'mid',
     }))
   } catch (e) {
     console.warn('fetchFunds failed:', e.message)
