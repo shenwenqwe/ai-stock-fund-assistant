@@ -15,15 +15,26 @@ export default function HomePage() {
   const [topFunds, setTopFunds] = useState(null)
   const [loading, setLoading] = useState(true)
   const [expandedCode, setExpandedCode] = useState(null)
+  const [lastUpdate, setLastUpdate] = useState('')
 
+  function getMarketStatus() {
+    const now = new Date()
+    const h = now.getHours(), m = now.getMinutes()
+    const t = h * 100 + m
+    if (t >= 930 && t < 1130) return 'open'
+    if (t >= 1300 && t < 1500) return 'open'
+    if (t >= 1130 && t < 1300) return 'break'
+    return 'closed'
+  }
+
+  const marketStatus = getMarketStatus()
   const today = new Date()
   const dateStr = `${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`
-  const hours = today.getHours()
-  const isMarketOpen = hours >= 9 && hours < 15
 
   useEffect(() => {
     loadRealData()
-    const timer = setInterval(loadRealData, isMarketOpen ? 30000 : 60000)
+    const interval = marketStatus === 'open' ? 10000 : 60000
+    const timer = setInterval(loadRealData, interval)
     return () => clearInterval(timer)
   }, [])
 
@@ -39,6 +50,8 @@ export default function HomePage() {
     if (sec) setSectors(sec)
     if (stk) setTopStocks(stk)
     if (fnd) setTopFunds(fnd)
+    const now = new Date()
+    setLastUpdate(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`)
     setLoading(false)
   }
 
@@ -82,9 +95,15 @@ export default function HomePage() {
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> 刷新
           </button>
         </div>
-        <div className="flex items-center gap-1 mb-3">
-          <Clock size={11} className="text-gray-400" />
-          <span className="text-xs text-gray-400">{dateStr} {isMarketOpen ? '交易中 · 实时更新' : '已收盘 · 收盘数据'}</span>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1">
+            <Clock size={11} className="text-gray-400" />
+            <span className="text-xs text-gray-400">{dateStr} {marketStatus === 'open' ? '🟢 交易中' : marketStatus === 'break' ? '🟡 午间休市' : '🔴 已收盘'}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            {marketStatus === 'open' && <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>}
+            <span className="text-xs text-gray-400">更新 {lastUpdate || '--:--:--'}</span>
+          </div>
         </div>
 
         <div className="flex gap-2 mb-3">
