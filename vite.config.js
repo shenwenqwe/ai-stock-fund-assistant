@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: process.env.VITE_BASE || '/',
+  base: '/ai-stock-fund-assistant/',
   server: {
     host: '0.0.0.0',
     port: 5173

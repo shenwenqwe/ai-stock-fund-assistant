@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://hanshui.github.io/ai-stock-fund-assistant",
+  "homepage": "https://shenwenqwe.github.io/ai-stock-fund-assistant",
   "scripts": {
     "dev": "vite",
     "dev:server": "node server/index.js",
