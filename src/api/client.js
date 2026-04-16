@@ -1,17 +1,34 @@
 const API_BASE = import.meta.env.VITE_API_BASE || ''
-const PROXY_LIST = [
-  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-]
 
-// Fetch via CORS proxy with fallback
+// Fetch via CORS proxy with multiple fallbacks
 async function proxyFetch(url) {
-  for (const mkProxy of PROXY_LIST) {
-    try {
-      const res = await fetch(mkProxy(url), { signal: AbortSignal.timeout(10000) })
-      if (res.ok) return await res.text()
-    } catch (e) { /* try next proxy */ }
-  }
+  // Method 1: allorigins /get (returns JSON wrapper, most reliable CORS)
+  try {
+    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, {
+      signal: AbortSignal.timeout(10000),
+    })
+    if (res.ok) {
+      const json = await res.json()
+      if (json.contents) return json.contents
+    }
+  } catch (e) { /* try next */ }
+
+  // Method 2: corsproxy.io
+  try {
+    const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`, {
+      signal: AbortSignal.timeout(10000),
+    })
+    if (res.ok) return await res.text()
+  } catch (e) { /* try next */ }
+
+  // Method 3: thingproxy
+  try {
+    const res = await fetch(`https://thingproxy.freeboard.io/fetch/${url}`, {
+      signal: AbortSignal.timeout(10000),
+    })
+    if (res.ok) return await res.text()
+  } catch (e) { /* all proxies failed */ }
+
   return null
 }
 
