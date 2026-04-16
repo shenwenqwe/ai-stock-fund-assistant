@@ -1,37 +1,181 @@
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
+// JSONP helper for East Money APIs (bypass CORS)
+function jsonp(url) {
+  return new Promise((resolve, reject) => {
+    const cbName = 'cb_' + Math.random().toString(36).slice(2, 8)
+    const script = document.createElement('script')
+    const timeout = setTimeout(() => { cleanup(); resolve(null) }, 8000)
+    function cleanup() {
+      clearTimeout(timeout)
+      delete window[cbName]
+      if (script.parentNode) script.parentNode.removeChild(script)
+    }
+    window[cbName] = (data) => { cleanup(); resolve(data) }
+    script.src = url.includes('callback=') ? url.replace('callback=', `callback=${cbName}`) : `${url}${url.includes('?') ? '&' : '?'}callback=${cbName}`
+    script.onerror = () => { cleanup(); resolve(null) }
+    document.head.appendChild(script)
+  })
+}
+
+// Try backend first, then JSONP fallback
 async function request(path) {
+  if (API_BASE) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`)
+      const json = await res.json()
+      if (json.success) return json.data
+    } catch (e) { /* fallback to JSONP */ }
+  }
+  return null
+}
+
+function formatVolume(vol) {
+  if (!vol || vol === '-') return '--'
+  const v = Number(vol)
+  if (v >= 100000000) return (v / 100000000).toFixed(2) + '亿'
+  if (v >= 10000) return (v / 10000).toFixed(1) + '万'
+  return String(v)
+}
+
+function formatCap(cap) {
+  if (!cap || cap === '-') return '--'
+  const c = Number(cap)
+  if (c >= 1000000000000) return (c / 1000000000000).toFixed(2) + '万亿'
+  if (c >= 100000000) return (c / 100000000).toFixed(2) + '亿'
+  return String(c)
+}
+
+export async function fetchIndices() {
+  const serverData = await request('/api/indices')
+  if (serverData) return serverData
+
   try {
-    const res = await fetch(`${API_BASE}${path}`)
-    const json = await res.json()
-    return json.success ? json.data : null
+    const data = await jsonp('https://push2.eastmoney.com/api/qt/ulist.np/get?fields=f1,f2,f3,f4,f12,f14&secids=1.000001,0.399001,0.399006,1.000300,0.399005')
+    const items = data?.data?.diff || []
+    return items.map(item => ({
+      name: item.f14,
+      code: item.f12,
+      value: item.f2 / 100,
+      change: item.f4 / 100,
+      changePercent: item.f3 / 100,
+    }))
   } catch (e) {
-    console.warn('API request failed:', path, e.message)
+    console.warn('fetchIndices failed:', e.message)
     return null
   }
 }
 
-export async function fetchIndices() {
-  return request('/api/indices')
-}
-
 export async function fetchStocks({ page = 1, size = 30, sort = 'f3', order = '0', market } = {}) {
-  const params = new URLSearchParams({ page, size, sort, order })
-  if (market) params.set('market', market)
-  return request(`/api/stocks?${params}`)
+  const serverData = await request(`/api/stocks?page=${page}&size=${size}&sort=${sort}&order=${order}`)
+  if (serverData) return serverData
+
+  try {
+    const fs = market || 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23'
+    const data = await jsonp(`https://push2.eastmoney.com/api/qt/clist/get?pn=${page}&pz=${size}&po=${order}&np=1&fltt=2&invt=2&fid=${sort}&fs=${fs}&fields=f2,f3,f4,f5,f6,f7,f9,f12,f14,f15,f16,f17,f18,f20`)
+    const items = data?.data?.diff || []
+    return items.filter(s => s.f2 > 0).map(item => ({
+      name: item.f14,
+      code: item.f12,
+      price: item.f2,
+      change: item.f4,
+      changePercent: item.f3,
+      volume: formatVolume(item.f5),
+      turnover: item.f6,
+      amplitude: item.f7,
+      high: item.f15,
+      low: item.f16,
+      open: item.f17,
+      prevClose: item.f18,
+      marketCap: item.f20 ? formatCap(item.f20) : '--',
+      pe: item.f9 ? (item.f9 / 100).toFixed(2) : '--',
+    }))
+  } catch (e) {
+    console.warn('fetchStocks failed:', e.message)
+    return null
+  }
 }
 
 export async function fetchFunds({ page = 1, size = 30, type = '' } = {}) {
-  const params = new URLSearchParams({ page, size, type })
-  return request(`/api/funds?${params}`)
+  const serverData = await request(`/api/funds?page=${page}&size=${size}&type=${type}`)
+  if (serverData) return serverData
+
+  try {
+    const data = await (await fetch(`https://fundapi.eastmoney.com/fundapi/FundRankListApi/FundRankList?fundType=${type}&pageIndex=${page}&pageSize=${size}&sort=desc&orderBy=D1`, {
+      headers: { 'Accept': 'application/json' },
+    })).json()
+    const items = data?.Data?.RankList || []
+    return items.map(item => ({
+      name: item.FundName,
+      code: item.FundCode,
+      nav: item.Nav,
+      accNav: item.AccNav,
+      dayChange: item.D1,
+      weekChange: item.W1,
+      monthChange: item.M1,
+      threeMonthChange: item.M3,
+      sixMonthChange: item.M6,
+      yearChange: item.Y1,
+      fundType: item.FundType,
+      riskLevel: item.RiskLevel || 'mid',
+    }))
+  } catch (e) {
+    console.warn('fetchFunds failed:', e.message)
+    return null
+  }
 }
 
 export async function fetchSectors() {
-  return request('/api/sectors')
+  const serverData = await request('/api/sectors')
+  if (serverData) return serverData
+
+  try {
+    const data = await jsonp('https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=15&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:90+t:2&fields=f2,f3,f4,f12,f14,f104,f105,f128,f140,f136')
+    const items = data?.data?.diff || []
+    return items.map(item => ({
+      name: item.f14,
+      code: item.f12,
+      changePercent: item.f3,
+      change: item.f4,
+      leadStock: item.f128 || item.f140 || '--',
+      leadChange: item.f136 || 0,
+      upCount: item.f104,
+      downCount: item.f105,
+    }))
+  } catch (e) {
+    console.warn('fetchSectors failed:', e.message)
+    return null
+  }
 }
 
 export async function fetchStockDetail(code) {
-  return request(`/api/stock/${code}`)
+  const serverData = await request(`/api/stock/${code}`)
+  if (serverData) return serverData
+
+  try {
+    const prefix = code.startsWith('6') ? '1' : '0'
+    const data = await jsonp(`https://push2.eastmoney.com/api/qt/stock/get?secid=${prefix}.${code}&fields=f43,f44,f45,f46,f47,f48,f57,f58,f60,f116,f162,f167,f169,f170`)
+    const d = data?.data || {}
+    return {
+      name: d.f58,
+      code: d.f57,
+      price: d.f43 / 100,
+      change: d.f169 / 100,
+      changePercent: d.f170 / 100,
+      open: d.f44 / 100,
+      high: d.f45 / 100,
+      low: d.f46 / 100,
+      prevClose: d.f60 / 100,
+      volume: d.f47,
+      turnover: d.f48,
+      marketCap: d.f116,
+      pe: d.f162 ? (d.f162 / 100).toFixed(2) : '--',
+      pb: d.f167 ? (d.f167 / 100).toFixed(2) : '--',
+    }
+  } catch (e) {
+    console.warn('fetchStockDetail failed:', e.message)
+    return null
+  }
 }
 
 export async function fetchFundDetail(code) {
@@ -43,5 +187,20 @@ export async function fetchFundHoldings(code) {
 }
 
 export async function searchStock(query) {
-  return request(`/api/search?q=${encodeURIComponent(query)}`)
+  const serverData = await request(`/api/search?q=${encodeURIComponent(query)}`)
+  if (serverData) return serverData
+
+  try {
+    const data = await (await fetch(`https://searchapi.eastmoney.com/api/suggest/get?input=${encodeURIComponent(query)}&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=10`)).json()
+    const items = data?.QuotationCodeTable?.Data || []
+    return items.map(item => ({
+      name: item.Name,
+      code: item.Code,
+      type: item.SecurityTypeName,
+      market: item.MktNum,
+    }))
+  } catch (e) {
+    console.warn('searchStock failed:', e.message)
+    return null
+  }
 }
